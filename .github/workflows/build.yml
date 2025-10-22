@@ -37,8 +37,8 @@ jobs:
     - name: Download OBS Dependencies
       run: |
         $ErrorActionPreference = "Stop"
-        # Use 2023-04-12 which is stable and known to work with OBS 30.x
-        $depsVersion = "2023-04-12"
+        # Use 2024-04-12 which has MSVC-compatible zlib
+        $depsVersion = "2024-04-12"
         $depsUrl = "https://github.com/obsproject/obs-deps/releases/download/$depsVersion/windows-deps-$depsVersion-x64.zip"
         Write-Host "Downloading OBS deps from: $depsUrl"
         Invoke-WebRequest -Uri $depsUrl -OutFile "obs-deps.zip"
@@ -52,7 +52,16 @@ jobs:
         mkdir build
         cd build
         $env:CMAKE_PREFIX_PATH = "${{github.workspace}}/obs-deps"
-        cmake -G "Visual Studio 17 2022" -A x64 -DCMAKE_PREFIX_PATH="${{github.workspace}}/obs-deps" -DENABLE_BROWSER=OFF -DENABLE_WEBSOCKET=OFF -DENABLE_QSV11=OFF -DENABLE_PLUGINS=OFF ..
+        # Add legacy flag for old zlib and disable certain features
+        cmake -G "Visual Studio 17 2022" -A x64 `
+          -DCMAKE_PREFIX_PATH="${{github.workspace}}/obs-deps" `
+          -DENABLE_BROWSER=OFF `
+          -DENABLE_WEBSOCKET=OFF `
+          -DENABLE_QSV11=OFF `
+          -DENABLE_PLUGINS=OFF `
+          -DCMAKE_CXX_FLAGS="/D_CRT_NONSTDC_NO_DEPRECATE /D_CRT_SECURE_NO_WARNINGS" `
+          -DCMAKE_C_FLAGS="/D_CRT_NONSTDC_NO_DEPRECATE /D_CRT_SECURE_NO_WARNINGS" `
+          ..
       shell: pwsh
 
     - name: Build OBS Studio
