@@ -7,68 +7,59 @@ on:
     branches: [ main, master ]
   workflow_dispatch:
 
+env:
+  PLUGIN_NAME: livedelay
+
 jobs:
-  build-windows:
-    runs-on: windows-latest
+  windows-build:
+    name: Windows Build
+    runs-on: windows-2022
 
     steps:
-    - name: Checkout plugin code
-      uses: actions/checkout@v3
+      - name: Checkout
+        uses: actions/checkout@v3
+        with:
+          submodules: recursive
 
-    - name: Install OBS Studio locally
-      run: |
-        choco install obs-studio -y
-      shell: pwsh
+      - name: Setup Environment
+        run: |
+          ## SETUP ENVIRONMENT SCRIPT
+          echo "OBS_VERSION=30.0.0" >> $env:GITHUB_ENV
 
-    - name: Checkout OBS Source for Headers
-      uses: actions/checkout@v3
-      with:
-        repository: obsproject/obs-studio
-        ref: '30.0.0'
-        path: obs-studio
+      - name: Build Plugin
+        uses: obsproject/obs-plugintemplate/.github/actions/build-plugin@main
+        with:
+          workingDirectory: ${{ github.workspace }}
+          target: ${{ matrix.config.target }}
+          config: RelWithDebInfo
 
-    - name: Setup Qt
-      uses: jurplel/install-qt-action@v3
-      with:
-        version: '6.5.0'
-        arch: 'win64_msvc2019_64'
+      - name: Package Plugin
+        run: |
+          mkdir release
+          Copy-Item "build_x64/rundir/RelWithDebInfo/obs-plugins/64bit/${{ env.PLUGIN_NAME }}.dll" release/
+          if (Test-Path "data/locale/en-US.ini") {
+            Copy-Item "data/locale/en-US.ini" release/
+          }
 
-    - name: Setup MSVC
-      uses: ilammy/msvc-dev-cmd@v1
+      - name: Upload Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ env.PLUGIN_NAME }}-windows
+          path: release/
 
-    - name: Build Plugin with CMake
-      run: |
-        mkdir build
-        cd build
-        cmake .. -G "Visual Studio 17 2022" -A x64 `
-          -DCMAKE_PREFIX_PATH="C:/Program Files/obs-studio" `
-          -DOBS_SOURCE_DIR="${{github.workspace}}/obs-studio"
-        cmake --build . --config Release
-      shell: pwsh
+      - name: Create Release
+        if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master'
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: v1.0.${{ github.run_number }}
+          name: LiveDelay v1.0.${{ github.run_number }}
+          files: release/*
+          draft: false
+          prerelease: false
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-    - name: Package Plugin
-      run: |
-        mkdir release
-        copy build\Release\livedelay.dll release\
-        if (Test-Path "data\locale\en-US.ini") {
-          copy data\locale\en-US.ini release\
-        }
-      shell: pwsh
-
-    - name: Upload Artifact
-      uses: actions/upload-artifact@v4
-      with:
-        name: livedelay-windows
-        path: release/
-
-    - name: Create Release
-      if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master'
-      uses: softprops/action-gh-release@v2
-      with:
-        tag_name: v1.0.${{ github.run_number }}
-        name: LiveDelay v1.0.${{ github.run_number }}
-        files: release/*
-        draft: false
-        prerelease: false
-      env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+    strategy:
+      matrix:
+        config:
+          - { target: x64, arch: x64 }
