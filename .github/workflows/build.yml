@@ -7,36 +7,87 @@ on:
     branches: [ main, master ]
   workflow_dispatch:
 
-env:
-  PLUGIN_NAME: livedelay
-
 jobs:
   windows-build:
     name: Windows Build
     runs-on: windows-2022
 
+    defaults:
+      run:
+        shell: pwsh
+
     steps:
       - name: Checkout
         uses: actions/checkout@v3
+
+      - name: Checkout OBS
+        uses: actions/checkout@v3
         with:
+          repository: obsproject/obs-studio
+          ref: '30.0.0'
+          path: obs-studio
+          fetch-depth: 0
           submodules: recursive
 
-      - name: Setup Environment
-        run: |
-          ## SETUP ENVIRONMENT SCRIPT
-          echo "OBS_VERSION=30.0.0" >> $env:GITHUB_ENV
+      - name: Setup MSVC
+        uses: ilammy/msvc-dev-cmd@v1
 
-      - name: Build Plugin
-        uses: obsproject/obs-plugintemplate/.github/actions/build-plugin@main
+      - name: Setup Qt
+        uses: jurplel/install-qt-action@v3
         with:
-          workingDirectory: ${{ github.workspace }}
-          target: ${{ matrix.config.target }}
-          config: RelWithDebInfo
+          version: '6.5.3'
+          arch: 'win64_msvc2019_64'
+          cache: true
+
+      - name: Setup Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.11'
+
+      - name: Download OBS Dependencies
+        run: |
+          $depsVersion = "2023-04-12"
+          Invoke-WebRequest `
+            -Uri "https://github.com/obsproject/obs-deps/releases/download/$depsVersion/windows-deps-$depsVersion-x64.zip" `
+            -OutFile deps.zip
+          Expand-Archive -Path deps.zip -DestinationPath deps
+
+      - name: Configure and Build OBS (minimal)
+        run: |
+          cd obs-studio
+          mkdir build
+          cd build
+
+          cmake -G "Visual Studio 17 2022" -A x64 `
+            -DCMAKE_BUILD_TYPE=RelWithDebInfo `
+            -DCMAKE_PREFIX_PATH="${{github.workspace}}/deps" `
+            -DENABLE_PLUGINS=OFF `
+            -DENABLE_UI=OFF `
+            -DENABLE_SCRIPTING=OFF `
+            -DENABLE_BROWSER=OFF `
+            -DENABLE_WEBSOCKET=OFF `
+            ..
+
+          # Only build the libraries we need
+          cmake --build . --config RelWithDebInfo --target obs-frontend-api -j
+
+      - name: Build LiveDelay Plugin
+        run: |
+          mkdir build
+          cd build
+
+          cmake -G "Visual Studio 17 2022" -A x64 `
+            -DCMAKE_BUILD_TYPE=RelWithDebInfo `
+            -DCMAKE_PREFIX_PATH="${{github.workspace}}/obs-studio/build;${{github.workspace}}/deps" `
+            -DOBS_SOURCE_DIR="${{github.workspace}}/obs-studio" `
+            ..
+
+          cmake --build . --config RelWithDebInfo
 
       - name: Package Plugin
         run: |
           mkdir release
-          Copy-Item "build_x64/rundir/RelWithDebInfo/obs-plugins/64bit/${{ env.PLUGIN_NAME }}.dll" release/
+          Copy-Item "build/RelWithDebInfo/livedelay.dll" release/
           if (Test-Path "data/locale/en-US.ini") {
             Copy-Item "data/locale/en-US.ini" release/
           }
@@ -44,7 +95,7 @@ jobs:
       - name: Upload Artifact
         uses: actions/upload-artifact@v4
         with:
-          name: ${{ env.PLUGIN_NAME }}-windows
+          name: livedelay-windows-x64
           path: release/
 
       - name: Create Release
@@ -54,12 +105,5 @@ jobs:
           tag_name: v1.0.${{ github.run_number }}
           name: LiveDelay v1.0.${{ github.run_number }}
           files: release/*
-          draft: false
-          prerelease: false
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
-    strategy:
-      matrix:
-        config:
-          - { target: x64, arch: x64 }
