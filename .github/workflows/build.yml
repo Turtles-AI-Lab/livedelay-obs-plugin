@@ -34,12 +34,21 @@ jobs:
     - name: Setup MSVC
       uses: microsoft/setup-msbuild@v1.1
 
+    - name: Download OBS Dependencies
+      run: |
+        $ErrorActionPreference = "Stop"
+        $depsVersion = "2023-11-03"
+        $depsUrl = "https://github.com/obsproject/obs-deps/releases/download/$depsVersion/windows-deps-$depsVersion-x64.zip"
+        Invoke-WebRequest -Uri $depsUrl -OutFile "obs-deps.zip"
+        Expand-Archive -Path "obs-deps.zip" -DestinationPath "${{github.workspace}}/obs-deps"
+      shell: pwsh
+
     - name: Configure OBS Studio
       run: |
         cd obs-studio
         mkdir build
         cd build
-        cmake -G "Visual Studio 17 2022" -A x64 -DENABLE_BROWSER=OFF -DENABLE_WEBSOCKET=OFF ..
+        cmake -G "Visual Studio 17 2022" -A x64 -DCMAKE_PREFIX_PATH="${{github.workspace}}/obs-deps;${{github.workspace}}/obs-deps/bin" -DENABLE_BROWSER=OFF -DENABLE_WEBSOCKET=OFF ..
 
     - name: Build OBS Studio
       run: |
@@ -51,7 +60,7 @@ jobs:
         cd plugin
         mkdir build
         cd build
-        cmake -G "Visual Studio 17 2022" -A x64 -DOBS_SOURCE_DIR="${{github.workspace}}/obs-studio" ..
+        cmake -G "Visual Studio 17 2022" -A x64 -DCMAKE_PREFIX_PATH="${{github.workspace}}/obs-deps;${{github.workspace}}/obs-deps/bin" -DOBS_SOURCE_DIR="${{github.workspace}}/obs-studio" ..
 
     - name: Build LiveDelay Plugin
       run: |
