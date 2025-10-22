@@ -6,17 +6,27 @@ project(livedelay VERSION 1.0.0)
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
-# Find OBS
-if(NOT DEFINED OBS_SOURCE_DIR)
-    set(OBS_SOURCE_DIR "" CACHE PATH "Path to OBS Studio source code")
-endif()
+# Try to find OBS as a package first (installed OBS)
+find_package(libobs QUIET)
+find_package(obs-frontend-api QUIET)
 
-if(NOT EXISTS "${OBS_SOURCE_DIR}/cmake/common/obs-modules.cmake")
-    message(FATAL_ERROR "OBS_SOURCE_DIR is not set correctly. Please set it to the OBS Studio source directory.")
-endif()
+# If not found, try source directory
+if(NOT libobs_FOUND)
+    if(NOT DEFINED OBS_SOURCE_DIR)
+        set(OBS_SOURCE_DIR "" CACHE PATH "Path to OBS Studio source code")
+    endif()
 
-list(APPEND CMAKE_MODULE_PATH "${OBS_SOURCE_DIR}/cmake/common")
-include(obs-modules)
+    if(NOT EXISTS "${OBS_SOURCE_DIR}/libobs")
+        message(FATAL_ERROR "OBS_SOURCE_DIR is not set correctly. Please set it to the OBS Studio source directory. Current value: ${OBS_SOURCE_DIR}")
+    endif()
+
+    # Add OBS build directory to CMAKE_PREFIX_PATH
+    list(APPEND CMAKE_PREFIX_PATH "${OBS_SOURCE_DIR}/build")
+
+    # Try finding again with build directory
+    find_package(libobs REQUIRED)
+    find_package(obs-frontend-api REQUIRED)
+endif()
 
 # Find Qt6
 find_package(Qt6 REQUIRED COMPONENTS Core Widgets)
