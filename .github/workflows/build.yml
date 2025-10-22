@@ -52,7 +52,7 @@ jobs:
         mkdir build
         cd build
         $env:CMAKE_PREFIX_PATH = "${{github.workspace}}/obs-deps"
-        cmake -G "Visual Studio 17 2022" -A x64 -DCMAKE_PREFIX_PATH="${{github.workspace}}/obs-deps" -DENABLE_BROWSER=OFF -DENABLE_WEBSOCKET=OFF ..
+        cmake -G "Visual Studio 17 2022" -A x64 -DCMAKE_PREFIX_PATH="${{github.workspace}}/obs-deps" -DENABLE_BROWSER=OFF -DENABLE_WEBSOCKET=OFF -DENABLE_QSV11=OFF -DENABLE_PLUGINS=OFF ..
       shell: pwsh
 
     - name: Build OBS Studio
