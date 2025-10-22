@@ -64,14 +64,14 @@ jobs:
         copy plugin\data\locale\en-US.ini release\
 
     - name: Upload Artifact
-      uses: actions/upload-artifact@v3
+      uses: actions/upload-artifact@v4
       with:
         name: livedelay-windows
         path: release/
 
     - name: Create Release
       if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master'
-      uses: softprops/action-gh-release@v1
+      uses: softprops/action-gh-release@v2
       with:
         tag_name: v1.0.${{ github.run_number }}
         name: LiveDelay v1.0.${{ github.run_number }}
