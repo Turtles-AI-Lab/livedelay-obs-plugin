@@ -37,14 +37,13 @@ jobs:
     - name: Download OBS Dependencies
       run: |
         $ErrorActionPreference = "Stop"
-        $depsVersion = "2024-08-14"
+        # Use 2023-04-12 which is stable and known to work with OBS 30.x
+        $depsVersion = "2023-04-12"
         $depsUrl = "https://github.com/obsproject/obs-deps/releases/download/$depsVersion/windows-deps-$depsVersion-x64.zip"
         Write-Host "Downloading OBS deps from: $depsUrl"
         Invoke-WebRequest -Uri $depsUrl -OutFile "obs-deps.zip"
         Expand-Archive -Path "obs-deps.zip" -DestinationPath "${{github.workspace}}/obs-deps"
-        Write-Host "OBS deps extracted to: ${{github.workspace}}/obs-deps"
-        Write-Host "Contents:"
-        Get-ChildItem "${{github.workspace}}/obs-deps" | Select-Object Name
+        Write-Host "OBS deps extracted successfully"
       shell: pwsh
 
     - name: Configure OBS Studio
