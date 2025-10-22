@@ -14,31 +14,18 @@ jobs:
     steps:
     - name: Checkout plugin code
       uses: actions/checkout@v3
+
+    - name: Install OBS Studio locally
+      run: |
+        choco install obs-studio -y
+      shell: pwsh
+
+    - name: Checkout OBS Source for Headers
+      uses: actions/checkout@v3
       with:
-        path: plugin
-
-    - name: Download OBS Studio Pre-built
-      run: |
-        $ErrorActionPreference = "Stop"
-        Write-Host "Downloading pre-built OBS Studio..."
-        # Download OBS 30.0.0 portable zip
-        $obsUrl = "https://github.com/obsproject/obs-studio/releases/download/30.0.0/OBS-Studio-30.0.0-Windows.zip"
-        Invoke-WebRequest -Uri $obsUrl -OutFile "obs.zip"
-        Write-Host "Extracting OBS..."
-        Expand-Archive -Path "obs.zip" -DestinationPath "${{github.workspace}}/obs-portable"
-        Write-Host "OBS extracted successfully"
-      shell: pwsh
-
-    - name: Download OBS Development Files
-      run: |
-        $ErrorActionPreference = "Stop"
-        Write-Host "Downloading OBS development files..."
-        # Download obs-deps for headers
-        $depsUrl = "https://github.com/obsproject/obs-studio/releases/download/30.0.0/obs-studio-30.0.0-windows-x64-debug.zip"
-        Invoke-WebRequest -Uri $depsUrl -OutFile "obs-dev.zip"
-        Expand-Archive -Path "obs-dev.zip" -DestinationPath "${{github.workspace}}/obs-dev"
-        Write-Host "Development files extracted"
-      shell: pwsh
+        repository: obsproject/obs-studio
+        ref: '30.0.0'
+        path: obs-studio
 
     - name: Setup Qt
       uses: jurplel/install-qt-action@v3
@@ -49,27 +36,24 @@ jobs:
     - name: Setup MSVC
       uses: ilammy/msvc-dev-cmd@v1
 
-    - name: Build Plugin
+    - name: Build Plugin with CMake
       run: |
-        # Create a simple build without CMake
-        cd plugin/src
-
-        # Compile plugin sources
-        cl.exe /LD /MD /O2 /I"${{github.workspace}}/obs-dev/include" /I"$env:Qt6_DIR/include" /I"$env:Qt6_DIR/include/QtCore" /I"$env:Qt6_DIR/include/QtWidgets" `
-          plugin-main.cpp delay-manager.cpp ui-components.cpp `
-          /link /OUT:livedelay.dll `
-          "${{github.workspace}}/obs-dev/bin/64bit/obs.lib" `
-          "${{github.workspace}}/obs-dev/bin/64bit/obs-frontend-api.lib" `
-          "$env:Qt6_DIR/lib/Qt6Core.lib" `
-          "$env:Qt6_DIR/lib/Qt6Widgets.lib"
+        mkdir build
+        cd build
+        cmake .. -G "Visual Studio 17 2022" -A x64 `
+          -DCMAKE_PREFIX_PATH="C:/Program Files/obs-studio" `
+          -DOBS_SOURCE_DIR="${{github.workspace}}/obs-studio"
+        cmake --build . --config Release
       shell: pwsh
 
     - name: Package Plugin
       run: |
         mkdir release
-        copy plugin\src\livedelay.dll release\
-        copy plugin\data\locale\en-US.ini release\
-      shell: cmd
+        copy build\Release\livedelay.dll release\
+        if (Test-Path "data\locale\en-US.ini") {
+          copy data\locale\en-US.ini release\
+        }
+      shell: pwsh
 
     - name: Upload Artifact
       uses: actions/upload-artifact@v4
