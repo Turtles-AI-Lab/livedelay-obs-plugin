@@ -53,14 +53,23 @@ jobs:
     - name: Build OBS Studio
       run: |
         cd obs-studio/build
+        cmake --build . --config RelWithDebInfo --target libobs
         cmake --build . --config RelWithDebInfo --target obs-frontend-api
 
     - name: Configure LiveDelay Plugin
       run: |
+        $obsPath = "${{github.workspace}}\obs-studio"
+        Write-Host "OBS Source Directory: $obsPath"
+        if (Test-Path "$obsPath\cmake\common\obs-modules.cmake") {
+          Write-Host "obs-modules.cmake found!"
+        } else {
+          Write-Host "ERROR: obs-modules.cmake NOT found!"
+        }
         cd plugin
         mkdir build
         cd build
         cmake -G "Visual Studio 17 2022" -A x64 -DCMAKE_PREFIX_PATH="${{github.workspace}}/obs-deps;${{github.workspace}}/obs-deps/bin" -DOBS_SOURCE_DIR="${{github.workspace}}/obs-studio" ..
+      shell: pwsh
 
     - name: Build LiveDelay Plugin
       run: |
