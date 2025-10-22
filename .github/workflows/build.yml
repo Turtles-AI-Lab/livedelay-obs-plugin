@@ -63,10 +63,18 @@ jobs:
           ..
       shell: pwsh
 
+    - name: Create legacy stdio stub
+      run: |
+        # Compile the stub to provide missing __ms_vsnprintf symbol
+        cl.exe /c /O2 "${{github.workspace}}/plugin/legacy-stdio-stub.c" /Fo"${{github.workspace}}/legacy-stdio-stub.obj"
+      shell: pwsh
+
     - name: Build OBS Studio
       run: |
         cd obs-studio/build
-        cmake --build . --config RelWithDebInfo --target libobs
+        # Add stub object to linker flags
+        $env:LDFLAGS = "${{github.workspace}}/legacy-stdio-stub.obj"
+        cmake --build . --config RelWithDebInfo --target libobs -- /p:AdditionalDependencies="${{github.workspace}}/legacy-stdio-stub.obj"
         cmake --build . --config RelWithDebInfo --target obs-frontend-api
 
     - name: Configure LiveDelay Plugin
